@@ -41,7 +41,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 Paste the generated value into `CREDENTIAL_ENCRYPTION_KEY`. Keep it private and stable: replacing it requires reconnecting Shopify.
 
-Apply the schema **once before opening the app**:
+Apply the schema using the command below, or sign in as the configured administrator and click **Initialize database** if the portal reports that its tables are missing:
 
 ```sh
 npm run db:migrate

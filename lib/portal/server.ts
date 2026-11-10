@@ -4,9 +4,10 @@ import { getDb } from '@/db';
 import { settings, creators, orders } from '@/db/schema';
 import { getPortalUser } from '@/lib/auth';
 import { attributeCode, moneyToMinor, type SaleOrder } from './rules';
+import {setupFailure} from './errors';
 export class PortalError extends Error { constructor(message:string, public status=400){super(message);} }
 export const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
-export function failure(error:unknown){return json({error:error instanceof PortalError?error.message:'Something went wrong. Please try again.'},error instanceof PortalError?error.status:500);}
+export function failure(error:unknown){if(error instanceof PortalError)return json({error:error.message,code:'PORTAL_ERROR'},error.status);const safe=setupFailure(error);console.error('[portal]',safe.code);return json({error:safe.error,code:safe.code},safe.status);}
 export function sameOrigin(req:Request){const expected=process.env.APP_URL?new URL(process.env.APP_URL).origin:new URL(req.url).origin;if(req.headers.get('origin')!==expected)throw new PortalError('Request origin is not allowed.',403);}
 export async function session(){
  const user=await getPortalUser();if(!user)throw new PortalError('Please sign in to continue.',401);

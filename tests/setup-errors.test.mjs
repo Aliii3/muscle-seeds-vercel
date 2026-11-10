@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {setupFailure} from '../lib/portal/errors.ts';
+import {initialMigration} from '../db/initial-migration.ts';
+import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {createClient} from '@libsql/client';
+test('missing connection gives actionable configuration guidance',()=>{const r=setupFailure(new Error('Set TURSO_DATABASE_URL before connecting'));assert.equal(r.code,'DATABASE_NOT_CONFIGURED');assert.equal(r.status,503);});
+test('wrapped missing-table errors can be initialized without leaking query parameters',()=>{const r=setupFailure(new Error('select failed for private@example.com',{cause:new Error('SQLITE_ERROR: no such table: settings')}));assert.equal(r.code,'DATABASE_SCHEMA_MISSING');assert.ok(!r.error.includes('private@example.com'));});
+test('Clerk service error is distinguished from the database',()=>{const e=new Error('redacted');e.name='ClerkIdentityError';assert.equal(setupFailure(e).code,'LOGIN_SERVICE_ERROR');});
+test('database auth failures never echo secret values',()=>{const r=setupFailure(new Error('LibsqlError: AUTH_FAILED secret-token-value'));assert.equal(r.code,'DATABASE_CONNECTION_ERROR');assert.ok(!r.error.includes('secret-token-value'));});
+test('browser initialization schema matches the existing migration and runs without seed data',async()=>{const sql=await readFile(new URL('../migrations/0001_initial.sql',import.meta.url),'utf8');assert.equal(createHash('sha256').update(sql).digest('hex'),initialMigration.checksum);const client=createClient({url:':memory:'});try{await client.batch(initialMigration.statements,'write');for(const table of ['settings','creators','orders'])assert.equal((await client.execute(`SELECT count(*) as n FROM ${table}`)).rows[0].n,0);}finally{client.close();}});
